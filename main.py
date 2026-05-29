@@ -1,0 +1,1 @@
+# Isi dengan 100 file (TXT/CSV/JSON)
