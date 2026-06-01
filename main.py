@@ -48,5 +48,42 @@ for idx, file_name in enumerate(files, 1):
 
 # Simpan hasil log ke dalam Dataframe & CSV
 df_hasil = pd.DataFrame(results_log)
+avg_row = {
+    'Id': 'Rata-rata',
+    'Plaintext': round(df_hasil['Plaintext'].mean(), 2),
+    'RSA': round(df_hasil['RSA'].mean(), 2),
+    'ElGamal': round(df_hasil['ElGamal'].mean(), 2),
+    'ECC': round(df_hasil['ECC'].mean(), 2),
+    'RSA-AES': round(df_hasil['RSA-AES'].mean(), 2)
+}
+df_hasil = pd.concat([df_hasil, pd.DataFrame([avg_row])], ignore_index=True)
 df_hasil.to_csv('hasil_ukuran_lkm_l6.csv', index=False)
+df_hasil.to_excel('hasil_ukuran_lkm_l6.xlsx', index=False)
 print("Eksperimen selesai! Data ukuran file telah direkam ke 'hasil_ukuran_lkm_l6.csv'.\n")
+
+# =======================================================
+# GENERASI GRAFIK PERBANDINGAN UKURAN (TUGAS 4)
+# =======================================================
+# Menghitung nilai rata-rata ukuran untuk grafik
+avg_data = df_hasil[['Plaintext', 'RSA', 'ElGamal', 'ECC', 'RSA-AES']].mean()
+
+plt.figure(figsize=(11, 6))
+sns.set_theme(style="whitegrid")
+
+# Buat grafik batang (Bar Chart)
+colors = ['#7f8c8d', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6']
+ax = sns.barplot(x=avg_data.index, y=avg_data.values, palette=colors)
+
+# Atur label dan judul grafik sesuai LKM
+plt.title('Analisis Perbandingan Rata-Rata Ukuran Plaintext vs Ciphertext (Tugas 4)', fontsize=14, fontweight='bold')
+plt.ylabel('Ukuran File Rata-Rata (KB)', fontsize=12)
+plt.xlabel('Jenis Algoritma / Data', fontsize=12)
+
+# Tambahkan angka nilai di atas bar masing-masing
+for p in ax.patches:
+    ax.annotate(f"{p.get_height():.2f} KB", (p.get_x() + p.get_width() / 2., p.get_height()),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points', fontsize=11, fontweight='bold')
+
+# Simpan grafik sebagai file gambar PNG
+plt.savefig('grafik_perbandingan_ukuran_lkm.png', dpi=300, bbox_inches='tight')
+plt.show()
