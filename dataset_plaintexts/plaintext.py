@@ -1,4 +1,7 @@
 import os
+import csv
+import io
+import json
 import random
 
 # Kumpulan kalimat bermakna agar isi file tetap logis dan bervariasi
@@ -36,10 +39,41 @@ def generate_meaningful_text(target_bytes):
         
     return "".join(lines)
 
+def serialize_content(content, file_format, file_index, category_name, size_bytes):
+    """Mengubah isi dasar menjadi TXT, CSV, atau JSON."""
+    lines = [line for line in content.splitlines() if line.strip()]
+
+    if file_format == "txt":
+        return content
+
+    if file_format == "csv":
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["file_index", "category", "line_number", "text"])
+        for line_number, line in enumerate(lines, start=1):
+            writer.writerow([file_index, category_name, line_number, line])
+        writer.writerow([file_index, category_name, "metadata", f"size_bytes={size_bytes}"])
+        return buffer.getvalue()
+
+    if file_format == "json":
+        payload = {
+            "file_index": file_index,
+            "category": category_name,
+            "size_bytes": size_bytes,
+            "lines": lines,
+        }
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    raise ValueError(f"Format file tidak dikenal: {file_format}")
+
 def main():
     # Folder output akan dibuat di dalam folder tempat skrip ini berada
     output_dir = "dataset_pengujian_total"
     os.makedirs(output_dir, exist_ok=True)
+    for existing_name in os.listdir(output_dir):
+        existing_path = os.path.join(output_dir, existing_name)
+        if os.path.isfile(existing_path):
+            os.remove(existing_path)
     
     # Semua rentang ukuran sudah dipastikan bertipe Integer (Aman untuk Python 3.14+)
     categories = [
@@ -51,31 +85,38 @@ def main():
     ]
     
     file_counter = 1
+    format_cycle = ["txt", "csv", "json"]
+    format_counts = {"txt": 0, "csv": 0, "json": 0}
     
     print("==================================================")
-    print("Mulai membuat 100 file dataset dari awal (001 - 100)")
+    print("Mulai membuat 100 file dataset campuran dari awal (001 - 100)")
     print("==================================================")
     
     for cat in categories:
         print(f"\n[Kategori {cat['name']}] Sedang membuat {cat['count']} file...")
         for i in range(cat["count"]):
             target_size = random.randint(cat["range"][0], cat["range"][1])
+            file_format = format_cycle[(file_counter - 1) % len(format_cycle)]
             
             # Generate konten teks
             content = generate_meaningful_text(target_size)
             
             # Formatting nama file berdasarkan ukuran
             size_bytes = len(content.encode('utf-8'))
+            content = serialize_content(content, file_format, file_counter, cat["name"], size_bytes)
+            size_bytes = len(content.encode('utf-8'))
             if size_bytes >= 1024 * 1024:
                 size_str = f"{size_bytes / (1024 * 1024):.2f}MB"
             else:
                 size_str = f"{size_bytes / 1024:.2f}KB"
                 
-            file_name = f"file_{file_counter:03d}_{cat['name']}_{size_str}.txt"
+            file_name = f"file_{file_counter:03d}_{cat['name']}_{size_str}.{file_format}"
             file_path = os.path.join(output_dir, file_name)
             
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
+
+            format_counts[file_format] += 1
                 
             file_counter += 1
             
@@ -83,6 +124,7 @@ def main():
 
     print("\n==================================================")
     print(f"Sukses! 100 file utuh berhasil dibuat di: '{output_dir}'")
+    print(f"Distribusi format: TXT={format_counts['txt']}, CSV={format_counts['csv']}, JSON={format_counts['json']}")
     print("==================================================")
 
 if __name__ == "__main__":
