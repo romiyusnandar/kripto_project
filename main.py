@@ -11,12 +11,12 @@ rsa_priv, rsa_pub = RSACryptosystem.generate_keys()
 elg_priv, elg_pub = ElGamalCryptosystem.generate_keys()
 ecc_priv, ecc_pub = ECCCryptosystem.generate_keys()
 
-# List penampung data evaluasi kuantitatif [cite: 31]
+# List penampung data evaluasi kuantitatif 
 log_data = []
 
 # Ambil 100 file dari direktori dataset 
 dataset_dir = 'dataset_plaintexts'
-files = sorted([f for f in os.listdir(dataset_dir) if f.endswith(('.txt', '.json', '.csv'))])[:100] [cite: 43, 66]
+files = sorted([f for f in os.listdir(dataset_dir) if f.endswith(('.txt', '.json', '.csv'))])[:100]
 
 print(f"Memulai pemrosesan {len(files)} file plainteks...\n")
 
