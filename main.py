@@ -1,64 +1,52 @@
 import os
-import time
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from kripto_core import RSACryptosystem, ElGamalCryptosystem, ECCCryptosystem, HybridRSAAES
 
-# Buat direktori output jika belum ada
-os.makedirs('output_ciphertexts', exist_ok=True)
-
-# Inisialisasi Keypair masing-masing skema 
+# 1. Inisialisasi Keypair awal
 rsa_priv, rsa_pub = RSACryptosystem.generate_keys()
-elg_priv, elg_pub = ElGamalCryptosystem.generate_keys()
-ecc_priv, ecc_pub = ECCCryptosystem.generate_keys()
+ecc_pub = ECCCryptosystem.generate_keys()
 
-# List penampung data evaluasi kuantitatif 
-log_data = []
-
-# Ambil 100 file dari direktori dataset 
+# Pastikan folder dataset tersedia (Simulasi 100 file jika belum di-clone dari Github)
 dataset_dir = 'dataset_plaintexts'
-files = sorted([f for f in os.listdir(dataset_dir) if f.endswith(('.txt', '.json', '.csv'))])[:100]
+os.makedirs(dataset_dir, exist_ok=True)
+if len(os.listdir(dataset_dir)) == 0:
+    for i in range(1, 101):
+        with open(f"{dataset_dir}/file_{i}.txt", "wb") as f:
+            # Membuat variasi ukuran file dari 1 KB hingga 200 KB agar grafiknya terlihat kontras
+            f.write(os.urandom(i * 2 * 1024))
 
-print(f"Memulai pemrosesan {len(files)} file plainteks...\n")
+# 2. Proses Eksperimen 100 File
+files = sorted([f for f in os.listdir(dataset_dir) if f.endswith(('.txt', '.csv', '.json'))])[:100]
+results_log = []
+
+print(f"Memproses {len(files)} file untuk komparasi 4 algoritma...")
 
 for idx, file_name in enumerate(files, 1):
     file_path = os.path.join(dataset_dir, file_name)
-    
     with open(file_path, 'rb') as f:
         plaintext = f.read()
         
-    p_size_kb = len(plaintext) / 1024.0 # Ukuran Plainteks (KB)
+    p_size = len(plaintext) / 1024.0 # Satuan Kilobytes (KB)
     
-    # --- PENGUJIAN HYBRID RSA-AES ---
-    t0 = time.perf_counter()
+    # Enkripsi ke masing-masing algoritma untuk mengukur ukuran hasil (Ciphertext)
+    c_rsa = RSACryptosystem.encrypt(plaintext, rsa_pub)
+    c_elgamal = ElGamalCryptosystem.encrypt(plaintext)
+    c_ecc = ECCCryptosystem.encrypt(plaintext, ecc_pub)
     c_hybrid = HybridRSAAES.encrypt(plaintext, rsa_pub)
-    t1 = time.perf_counter()
-    enc_time_hybrid = (t1 - t0) * 1000 # convert ke millisecond
     
-    t2 = time.perf_counter()
-    p_dec_hybrid = HybridRSAAES.decrypt(c_hybrid, rsa_priv)
-    t3 = time.perf_counter()
-    dec_time_hybrid = (t3 - t2) * 1000
-    
-    # Simpan hasil cipherteks ke disk 
-    out_path = f"output_ciphertexts/{file_name}_hybrid.enc"
-    with open(out_path, 'wb') as out_f:
-        out_f.read(c_hybrid) if hasattr(c_hybrid, 'read') else out_f.write(c_hybrid) 
-        
-    c_size_hybrid_kb = len(c_hybrid) / 1024.0
-
-    # Eksekusi untuk algoritma lainnya (RSA murni, ElGamal murni, ECC murni) 
-    # Catatan: Masukkan logic try-except jika file berukuran besar (>100KB) membuat RSA murni crash 
-    
-    # Append records untuk dataframe analisis
-    log_data.append({
+    # Catat data ukuran file (KB)
+    results_log.append({
         'Id': idx,
-        'Ukuran Plaintext (KB)': round(p_size_kb, 2),
-        'Enc Time Hybrid (ms)': round(enc_time_hybrid, 4),
-        'Dec Time Hybrid (ms)': round(dec_time_hybrid, 4),
-        'Cipher Size Hybrid (KB)': round(c_size_hybrid_kb, 2)
+        'Plaintext': round(p_size, 2),
+        'RSA': round(len(c_rsa) / 1024.0, 2),
+        'ElGamal': round(len(c_elgamal) / 1024.0, 2),
+        'ECC': round(len(c_ecc) / 1024.0, 2),
+        'RSA-AES': round(len(c_hybrid) / 1024.0, 2)
     })
 
-# Konversi log ke Dataframe & Simpan ke CSV untuk bahan grafik spreadsheet
-df_hasil = pd.DataFrame(log_data)
-df_hasil.to_csv('hasil_pengujian_kripto.csv', index=False)
-print("\nPengujian Selesai! File 'hasil_pengujian_kripto.csv' berhasil dibuat.")
+# Simpan hasil log ke dalam Dataframe & CSV
+df_hasil = pd.DataFrame(results_log)
+df_hasil.to_csv('hasil_ukuran_lkm_l6.csv', index=False)
+print("Eksperimen selesai! Data ukuran file telah direkam ke 'hasil_ukuran_lkm_l6.csv'.\n")
