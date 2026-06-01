@@ -87,3 +87,45 @@ for p in ax.patches:
 # Simpan grafik sebagai file gambar PNG
 plt.savefig('grafik_perbandingan_ukuran_lkm.png', dpi=300, bbox_inches='tight')
 plt.show()
+
+# =======================================================
+# GENERASI GRAFIK PERBANDINGAN BERPASANGAN (TUGAS 4)
+# =======================================================
+sns.set_theme(style="whitegrid")
+
+# Ambil nilai rata-rata dari dict avg_row yang sudah kamu buat
+p_avg = avg_row['Plaintext']
+algorithms = {
+    'RSA': {'val': avg_row['RSA'], 'color': '#e74c3c', 'filename': '1_perbandingan_plain_rsa.png'},
+    'ElGamal': {'val': avg_row['ElGamal'], 'color': '#3498db', 'filename': '2_perbandingan_plain_elgamal.png'},
+    'ECC': {'val': avg_row['ECC'], 'color': '#2ecc71', 'filename': '3_perbandingan_plain_ecc.png'},
+    'RSA-AES': {'val': avg_row['RSA-AES'], 'color': '#9b59b6', 'filename': '4_perbandingan_plain_rsa_aes.png'}
+}
+
+# Lakukan perulangan untuk membuat 4 grafik terpisah
+for algo_name, info in algorithms.items():
+    plt.figure(figsize=(7, 5))
+    
+    # Data pasangannya (Plain vs Algoritma Spesifik)
+    categories = ['Plaintext', f'Ciphertext {algo_name}']
+    values = [p_avg, info['val']]
+    
+    # Plot diagram batang
+    ax = sns.barplot(x=categories, y=values, palette=['#7f8c8d', info['color']], width=0.5)
+    
+    # Kustomisasi teks dan judul
+    plt.title(f'Perbandingan Rata-Rata Ukuran:\nPlaintext vs {algo_name}', fontsize=12, fontweight='bold')
+    plt.ylabel('Ukuran File (KB)', fontsize=11)
+    plt.ylim(0, max(values) * 1.15) # Beri ruang di atas bar untuk label angka
+    
+    # Tambahkan angka presisi di atas masing-masing batang
+    for p in ax.patches:
+        ax.annotate(f"{p.get_height():.2f} KB", (p.get_x() + p.get_width() / 2., p.get_height()),
+                    ha='center', va='center', xytext=(0, 8), textcoords='offset points', fontsize=10, fontweight='bold')
+    
+    # Simpan masing-masing gambar ke storage Colab
+    plt.savefig(info['filename'], dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"Berhasil menyimpan: {info['filename']}")
+
+print("\nSemua 4 grafik berpasangan siap diunduh untuk LKM!")
