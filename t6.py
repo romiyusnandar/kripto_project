@@ -1,20 +1,20 @@
+import os
 import math
 import numpy as np
+import pandas as pd
 from scipy.stats import pearsonr
-import kripto_core  # Memanggil file utama dari github kamu
+from kripto_core import RSACryptosystem, ElGamalCryptosystem, ECCCryptosystem, HybridRSAAES
 
-# ==========================================
-# 1. FUNGSI MATEMATIS EVALUASI REKAYASA
-# ==========================================
+# =======================================================
+# 1. FUNGSI TEKNIS EVALUASI DATA
+# =======================================================
 
 def hitung_shannon_entropy(data_bytes):
-    """Menghitung Shannon Entropy (Tugas 6)"""
     if not data_bytes:
         return 0.0
     freq = {}
     for b in data_bytes:
         freq[b] = freq.get(b, 0) + 1
-    
     entropy = 0.0
     total = len(data_bytes)
     for count in freq.values():
@@ -23,130 +23,100 @@ def hitung_shannon_entropy(data_bytes):
     return entropy
 
 def hitung_pearson_correlation(plain_bytes, cipher_bytes):
-    """Menghitung Korelasi Pearson antara Plaintext & Ciphertext (Tugas 7)"""
-    # Menyamakan panjang array untuk kebutuhan matriks korelasi Pearson
     len_min = min(len(plain_bytes), len(cipher_bytes))
     if len_min < 2:
         return 0.0
-    
     arr_plain = np.frombuffer(plain_bytes[:len_min], dtype=np.uint8)
     arr_cipher = np.frombuffer(cipher_bytes[:len_min], dtype=np.uint8)
-    
-    # Hitung koefisien korelasi pearson (r)
     corr, _ = pearsonr(arr_plain, arr_cipher)
     return 0.0 if np.isnan(corr) else corr
 
 def hitung_avalanche_effect(cipher_bytes_1, cipher_bytes_2):
-    """Menghitung Avalanche Effect persentase perubahan bit (Tugas 8)"""
     len_min = min(len(cipher_bytes_1), len(cipher_bytes_2))
     if len_min == 0:
         return 0.0
-    
     total_bits = len_min * 8
     bit_berubah = 0
-    
-    # XOR setiap byte untuk melihat perbedaan bit yang aktif
     for b1, b2 in zip(cipher_bytes_1[:len_min], cipher_bytes_2[:len_min]):
         xor_result = b1 ^ b2
         bit_berubah += bin(xor_result).count('1')
-        
     return (bit_berubah / total_bits) * 100
 
-# ==========================================
-# 2. SIMULASI & OTOMATISASI EKSPERIMEN
-# ==========================================
+# =======================================================
+# 2. INISIALISASI ENVIRONMENT & PARAMETER REFF KODE KAMU
+# =======================================================
+rsa_priv, rsa_pub = RSACryptosystem.generate_keys()
+ecc_pub = ECCCryptosystem.generate_keys()
 
-# Dummy 100 dataset dengan variasi ukuran sesuai tabel LKM (TXT, CSV, JSON)
-# Pada implementasi riil, kamu bisa menggantinya dengan membaca file asli dari direktori
-np.random.seed(42)
-file_sizes_kb = [np.random.uniform(2, 10) for _ in range(20)] + \
-                [np.random.uniform(10, 100) for _ in range(20)] + \
-                [np.random.uniform(100, 1000) for _ in range(20)] + \
-                [np.random.uniform(1000, 5000) for _ in range(40)]
+dataset_dir = 'dataset_plaintexts'
+files = sorted([f for f in os.listdir(dataset_dir) if f.endswith(('.txt', '.csv', '.json'))])[:100]
 
-print("Mulai Pemrosesan Eksperimen Kriptografi...\n")
-print(f"{'Id':<5}{'Size(KB)':<10}{'Ent_Plain':<10}{'Ent_RSA':<10}{'Ent_ECC':<10}{'Corr_RSA':<10}{'Aval_RSA':<10}")
-print("-" * 70)
+eval_results = []
+print(f"Membaca {len(files)} file fisik dari '{dataset_dir}'...")
 
-total_ent_plain, total_ent_rsa, total_ent_elg, total_ent_ecc, total_ent_hybrid = 0, 0, 0, 0, 0
-total_corr_rsa, total_corr_elg, total_corr_ecc, total_corr_hybrid = 0, 0, 0, 0
-total_ava_rsa, total_ava_elg, total_ava_ecc, total_ava_hybrid = 0, 0, 0, 0
-
-# Loop Pengujian 100 File
-for idx, size in enumerate(file_sizes_kb, 1):
-    # 1. Generate Plaintext Berdasarkan Ukuran Eksperimen
-    num_bytes = int(size * 1024)
-    plaintext = bytes([np.random.randint(65, 90) for _ in range(num_bytes)]) # Karakter A-Z acak berpola
+# Loop memproses file yang sama persis dengan Tugas Waktu & Ukuran
+for idx, file_name in enumerate(files, 1):
+    file_path = os.path.join(dataset_dir, file_name)
+    with open(file_path, 'rb') as f:
+        plaintext = f.read()
+        
+    p_size = len(plaintext) / 1024.0
     
-    # Simulasi perubahan 1 bit untuk Avalanche Effect
+    # Payload simulasi modifikasi bit (Balikan bit terakhir pada byte pertama) untuk Avalanche
     plaintext_altered = bytearray(plaintext)
-    plaintext_altered[0] ^= 1 # Mengubah tepat 1 bit di byte pertama
+    if len(plaintext_altered) > 0:
+        plaintext_altered[0] ^= 1
     plaintext_altered = bytes(plaintext_altered)
     
-    # 2. Simulasi Enkripsi menggunakan fungsi dari kripto_core.py kamu
-    # Catatan: Karena di Github kamu fungsi enkripsi asimetris murni (RSA/ElGamal) 
-    # memiliki limit ukuran blok padding, skrip ini menyimulasikan output biner enkripsinya.
+    # --- PROSES ENKRIPSI DATA ASLI ---
+    c_rsa = RSACryptosystem.encrypt(plaintext, rsa_pub)
+    c_elgamal = ElGamalCryptosystem.encrypt(plaintext)
+    c_ecc = ECCCryptosystem.encrypt(plaintext, ecc_pub)
+    c_hybrid = HybridRSAAES.encrypt(plaintext, rsa_pub)
     
-    # Enkripsi Berkas Asli
-    c_rsa = kripto_core.encrypt_rsa(plaintext) if num_bytes < 200 else plaintext + b"_rsa_pad"
-    c_elg = kripto_core.encrypt_elgamal(plaintext) if num_bytes < 200 else plaintext + plaintext # Ekspansi 2x
-    c_ecc = kripto_core.encrypt_ecc(plaintext)
-    c_hybrid = kripto_core.encrypt_rsa_aes(plaintext)
+    # --- PROSES ENKRIPSI DATA TERUBAH 1 BIT ---
+    c_rsa_alt = RSACryptosystem.encrypt(plaintext_altered, rsa_pub)
+    c_elg_alt = ElGamalCryptosystem.encrypt(plaintext_altered)
+    c_ecc_alt = ECCCryptosystem.encrypt(plaintext_altered, ecc_pub)
+    c_hybrid_alt = HybridRSAAES.encrypt(plaintext_altered, rsa_pub)
     
-    # Enkripsi Berkas yang Diubah 1 bit (Untuk Avalanche)
-    c_rsa_alt = kripto_core.encrypt_rsa(plaintext_altered) if num_bytes < 200 else plaintext_altered + b"_rsa_pax"
-    c_elg_alt = kripto_core.encrypt_elgamal(plaintext_altered) if num_bytes < 200 else plaintext_altered + plaintext_altered
-    c_ecc_alt = kripto_core.encrypt_ecc(plaintext_altered)
-    c_hybrid_alt = kripto_core.encrypt_rsa_aes(plaintext_altered)
-    
-    # 3. Hitung Evaluasi Tugas 6 (Entropi)
-    ep = hitung_shannon_entropy(plaintext)
-    e_rsa = hitung_shannon_entropy(c_rsa)
-    e_elg = hitung_shannon_entropy(c_elg)
-    e_ecc = hitung_shannon_entropy(c_ecc)
-    e_hybrid = hitung_shannon_entropy(c_hybrid)
-    
-    # 4. Hitung Evaluasi Tugas 7 (Korelasi Pearson)
-    corr_rsa = hitung_pearson_correlation(plaintext, c_rsa)
-    corr_elg = hitung_pearson_correlation(plaintext, c_elg)
-    corr_ecc = hitung_pearson_correlation(plaintext, c_ecc)
-    corr_hybrid = hitung_pearson_correlation(plaintext, c_hybrid)
-    
-    # 5. Hitung Evaluasi Tugas 8 (Avalanche Effect)
-    ava_rsa = hitung_avalanche_effect(c_rsa, c_rsa_alt) if num_bytes < 200 else np.random.uniform(48, 52)
-    ava_elg = hitung_avalanche_effect(c_elg, c_elg_alt) if num_bytes < 200 else np.random.uniform(49, 51)
-    ava_ecc = hitung_avalanche_effect(c_ecc, c_ecc_alt)
-    ava_hybrid = hitung_avalanche_effect(c_hybrid, c_hybrid_alt)
-    
-    # Akumulasi untuk nilai rata-rata akhir
-    total_ent_plain += ep; total_ent_rsa += e_rsa; total_ent_elg += e_elg; total_ent_ecc += e_ecc; total_ent_hybrid += e_hybrid
-    total_corr_rsa += corr_rsa; total_corr_elg += corr_elg; total_corr_ecc += corr_ecc; total_corr_hybrid += corr_hybrid
-    total_ava_rsa += ava_rsa; total_ava_elg += ava_elg; total_ava_ecc += ava_ecc; total_ava_hybrid += ava_hybrid
-    
-    # Print status log 10 sampel awal sebagai monitoring proses
-    if idx <= 5 or idx == 100:
-        print(f"{idx:<5}{size:<10.2f}{ep:<10.4f}{e_rsa:<10.4f}{e_ecc:<10.4f}{corr_rsa:<10.4f}{ava_hybrid:<10.2f}%")
+    # --- PENILAIAN EVALUASI METRIKS ---
+    eval_results.append({
+        'Id': idx,
+        'Ukuran (KB)': round(p_size, 2),
+        'Entropi Plaintext': round(hitung_shannon_entropy(plaintext), 4),
+        'Entropi RSA': round(hitung_shannon_entropy(c_rsa), 4),
+        'Entropi ElGamal': round(hitung_shannon_entropy(c_elgamal), 4),
+        'Entropi ECC': round(hitung_shannon_entropy(c_ecc), 4),
+        'Entropi Hybrid': round(hitung_shannon_entropy(c_hybrid), 4),
+        
+        'Korelasi RSA': round(hitung_pearson_correlation(plaintext, c_rsa), 6),
+        'Korelasi ElGamal': round(hitung_pearson_correlation(plaintext, c_elgamal), 6),
+        'Korelasi ECC': round(hitung_pearson_correlation(plaintext, c_ecc), 6),
+        'Korelasi Hybrid': round(hitung_pearson_correlation(plaintext, c_hybrid), 6),
+        
+        'Avalanche RSA (%)': round(hitung_avalanche_effect(c_rsa, c_rsa_alt), 2),
+        'Avalanche ElGamal (%)': round(hitung_avalanche_effect(c_elgamal, c_elg_alt), 2),
+        'Avalanche ECC (%)': round(hitung_avalanche_effect(c_ecc, c_ecc_alt), 2),
+        'Avalanche Hybrid (%)': round(hitung_avalanche_effect(c_hybrid, c_hybrid_alt), 2),
+    })
 
-# ==========================================
-# 3. OUTPUT RESUME DATA RATA-RATA AKHIR
-# ==========================================
-print("-" * 70)
-print(f"\nHasil Nilai Rata-Rata Akhir untuk Dimasukkan ke Tabel LKM:")
-print(f"1. RATA-RATA ENTROPI (TUGAS 6):")
-print(f"   - Plaintext : {total_ent_plain/100:.4f} bit")
-print(f"   - RSA       : {total_ent_rsa/100:.4f} bit")
-print(f"   - ElGamal   : {total_ent_elg/100:.4f} bit")
-print(f"   - ECC       : {total_ent_ecc/100:.4f} bit")
-print(f"   - RSA-AES   : {total_ent_hybrid/100:.4f} bit")
+# =======================================================
+# 3. EXPORT HASIL DAN PENGHITUNGAN RATA-RATA AKHIR
+# =======================================================
+df_eval = pd.DataFrame(eval_results)
 
-print(f"\n2. RATA-RATA KORELASI PEARSON (TUGAS 7):")
-print(f"   - RSA       : {total_corr_rsa/100:.6f}")
-print(f"   - ElGamal   : {total_corr_elg/100:.6f}")
-print(f"   - ECC       : {total_corr_ecc/100:.6f}")
-print(f"   - RSA-AES   : {total_corr_hybrid/100:.6f}")
+# Membuat baris rata-rata numerik eksplisit
+avg_metrics = df_eval.mean().to_dict()
+avg_metrics['Id'] = 'Rata-rata'
 
-print(f"\n3. RATA-RATA AVALANCHE EFFECT (TUGAS 8):")
-print(f"   - RSA       : {total_ava_rsa/100:.2f} %")
-print(f"   - ElGamal   : {total_ava_elg/100:.2f} %")
-print(f"   - ECC       : {total_ava_ecc/100:.2f} %")
-print(f"   - RSA-AES   : {total_ava_hybrid/100:.2f} %")
+df_eval = pd.concat([df_eval, pd.DataFrame([avg_metrics])], ignore_index=True)
+
+# Tulis ke file spreadsheet Excel tunggal
+output_excel = 'hasil_evaluasi_lkm_l6.xlsx'
+df_eval.to_excel(output_excel, index=False, sheet_name='Metriks Keamanan')
+
+print("\n" + "="*60)
+print(f"SUKSES! 100 berkas fisik dievaluasi secara linier.")
+print(f"Output disimpan pada: {output_excel}")
+print("="*60)
